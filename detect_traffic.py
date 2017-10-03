@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import cv2
 import numpy as np
 import imutils
@@ -39,3 +40,5 @@ while 1:
 
 cap.release()
 cv2.destroyAllWindows()
+=======
+>>>>>>> c5394ce0dff49fce9401803813102995510bb49c
