@@ -5,8 +5,9 @@ import imutils
 
 
 #PROBLEMS ATM
-#Region of interest not being updated when calling tracker!!! (Tracker problem? Problem in code? POINTER PROBLEM!?)
+#Region of interest not being updated when calling tracker!!! (Tracker problem? Problem in code?)
 #Region of interest is updated while known object is found and then changed back to original position when tracker is updated
+#PROBLEM WAS: Object was initialized with the frame it was found in. This frame was used to track so it was static.
 
 
 class Feed:
@@ -17,6 +18,9 @@ class Feed:
         ret, read = self.feed.read()
         crop = imutils.resize(read, width=640, height=480)
         return ret, crop
+
+    def set_feed(self, feed):
+        self.feed = cv2.VideoCapture(feed)
 
     def close(self):
         return self.feed.close()
@@ -37,32 +41,34 @@ class Object:
         self.tracker = Tracker(frame, roi)
         self.roi = roi
         self.object_name = object_name
-        self.frame = frame
 
     def draw(self, frame):
         cv2.rectangle(frame, (int(self.roi[0]), int(self.roi[1])), (int(self.roi[0] + self.roi[2]), int(self.roi[1]+ self.roi[3])), (255, 0, 0), 2)
-        cv2.putText(frame, self.object_name, (int(self.roi[0]), int(self.roi[1]) - 5), cv2.FONT_HERSHEY_COMPLEX, 1, (0, 255, 255), 1)
+        cv2.putText(frame, self.object_name, (int(self.roi[0]), int(self.roi[1]) - 5), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 1)
 
     def set_roi(self, roi):
         self.roi = roi
 
-    def update_tracker(self):
-        ok, self.roi = self.tracker.update(self.frame)
+    def init_tracker(self, frame, roi):
+        self.tracker.init_tracker(frame, roi)
+
+    def update_tracker(self, frame):
+        ok, self.roi = self.tracker.update(frame)
         return ok
 
 class Tracker:
     def __init__(self, frame, roi):
-        self.init, self.tracker = self.init_tracker(frame, roi)
+        self.tracker = cv2.TrackerKCF_create()
+        self.init = self.init_tracker(frame, roi)
 
     def init_tracker(self, frame, roi):
-        tracker = cv2.TrackerKCF_create()
-        ret = tracker.init(frame, tuple(roi))
-        return ret, tracker
+        ret = self.tracker.init(frame, roi)
+        return ret
 
     def update(self, frame):
-        ret, roi = self.tracker.update(frame)
-        return ret, roi
-
+        if self.init:
+            ret, roi = self.tracker.update(frame)
+            return ret, roi
 
 class Traffic:
     def __init__(self, feed):
@@ -75,12 +81,12 @@ class Traffic:
 
     def update_bodies(self, frame):
         updated = self.get_bodies(frame)
-        #self.update_trackers(updated)
+        self.update_trackers(frame, updated)
 
-    def update_trackers(self, updated):
+    def update_trackers(self, frame, updated):
         for i, obj in enumerate(self.traffic):
             if i not in updated:
-                obj.update_tracker()
+                obj.update_tracker(frame)
 
     def get_bodies(self, frame):
         #Get all bodies with fullbody cascade
@@ -96,12 +102,13 @@ class Traffic:
             for body in bodies:
 
                 #Check if body already exists
-                index = self.get_object(body, 70)
+                index = self.get_object(body, 200)
                 if index == -1: #Found new body
                     self.traffic.append(Object(frame, tuple(body), "Person"))
                     updated.append(len(self.traffic) - 1) #Add just added value from traffic list to updated list
                 else: #Found known body
                     self.traffic[index].set_roi(tuple(body))
+                    self.traffic[index].init_tracker(frame, tuple(body))
         return updated
 
     def draw_traffic(self, frame):
@@ -109,7 +116,7 @@ class Traffic:
             obj.draw(frame)
 
     def set_feed(self, feed):
-        self.feed = Feed(feed)
+        self.feed.set_feed(feed)
 
     def get_dist(self, obj1, obj2):
         #Get x, y from object 1
@@ -139,7 +146,7 @@ class Traffic:
             if k == 27:
                 break
 
-traffic = Traffic("img/walking4.mp4")
+traffic = Traffic("img/warehouse.mp4")
 traffic.set_body_cascade("cascades/haarcascade_fullbody.xml")
 
 traffic.find_traffic()
