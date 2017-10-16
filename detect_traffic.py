@@ -45,6 +45,12 @@ class Object:
     def draw(self, frame):
         cv2.rectangle(frame, (int(self.roi[0]), int(self.roi[1])), (int(self.roi[0] + self.roi[2]), int(self.roi[1]+ self.roi[3])), (255, 0, 0), 2)
         cv2.putText(frame, self.object_name, (int(self.roi[0]), int(self.roi[1]) - 5), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 1)
+        if self.roi is None:
+            print("ROI is not known")
+        else:
+            cv2.rectangle(frame, (self.roi[0], self.roi[1]), (self.roi[2], self.roi[3]), (255, 0, 0), 2)
+            cv2.putText(frame, self.object_name, (self.roi[0], self.roi[1] - 20), "verdana", (0, 255, 255))
+            return frame
 
     def set_roi(self, roi):
         self.roi = roi
