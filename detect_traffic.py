@@ -84,37 +84,92 @@ class Tracker:
 class Corridor:
     def __init__(self, feed):
         self.traffic = Traffic(feed)
+        self.traffic.set_body_cascade("cascades/haarcascade_fullbody.xml")
         self.feed = Feed(feed)
-        _, self.init_frame = self.feed.read()
-        self.corr_begin_p1, self.corr_begin_p2 = None, None
+        self.init_frame = imutils.resize(cv2.imread("img/warehouse.jpg"), width=640, height=480)
+        self.corr_begin_p1, self.corr_begin_p2 = None, None #Pass maybe as constructor argument
         self.corr_end_p1, self.corr_end_p2 = None, None
 
     def set_feed(self, feed):
         self.feed.set_feed(feed)
 
+    #INIT
+    #Main init function (NOT PERMANENT YET)
     def init_corridor(self):
+        self.init_start_corridor()
+        self.init_end_corridor()
+        self.get_depth(200)
+        self.draw_corridor_grid(10)
+        self.draw_corridor()
+
+    def get_depth(self, angle):
+        height = 30
+        angle = 60 #deg
+        for i in range(90):
+            dist = height * math.tan(math.radians(i))
+            print(i, ", ", dist)
+
+
+    def draw_corridor_grid(self, grid_width):
+        begin_length = abs(self.corr_begin_p1[0] - self.corr_begin_p2[0])
+        end_length = abs(self.corr_end_p1[0] - self.corr_end_p2[0])
+        block_width_begin = round(begin_length / grid_width, 0)
+        block_width_end = round(end_length / grid_width, 0)
+        for i in range(1, grid_width):
+            begin = (int(round(self.corr_begin_p1[0] + (i * block_width_begin), 0)), self.corr_begin_p1[1])
+            end = (int(round(self.corr_end_p1[0] + (i * block_width_end), 0)), self.corr_end_p1[1])
+            cv2.line(self.init_frame, begin, end, (255, 0, 0), 1)
+
+
+    def draw_corridor(self):
+        cv2.line(self.init_frame, self.corr_begin_p1, self.corr_begin_p2, (255, 0, 0), 1)
+        cv2.line(self.init_frame, self.corr_end_p1, self.corr_end_p2, (255, 0, 0), 1)
+        cv2.line(self.init_frame, self.corr_begin_p1, self.corr_end_p1, (255, 0, 0), 1)
+        cv2.line(self.init_frame, self.corr_begin_p2, self.corr_end_p2, (255, 0, 0), 1)
         while 1:
-            cv2.namedWindow('real image')
-            cv2.setMouseCallback('real image', self.on_mouse, 0)
-            cv2.imshow('real image', self.init_frame)
+            cv2.imshow('Warehouse', self.init_frame)
             k = cv2.waitKey(1) & 0xFF
             if k == 27:
                 break
 
-    def on_mouse(self, event, x, y, flags, params):
-        if event == cv2.EVENT_LBUTTONDOWN:
-            print('Start Mouse Position: ' + str(x) + ', ' + str(y))
-            start = (x, y)
-        elif event == cv2.EVENT_LBUTTONUP:
-            print('End Mouse Position: ' + str(x) + ', ' + str(y))
-            end = (x, y)
+    def init_start_corridor(self):
+        cv2.namedWindow('Begin corridor')
+        cv2.setMouseCallback('Begin corridor', self.start_corridor, 0)
+        cv2.imshow('Begin corridor', self.init_frame)
+        while 1:
+            cv2.waitKey(1)
+            if self.corr_begin_p1 is not None and self.corr_begin_p2 is not None:
+                cv2.destroyWindow('Begin corridor')
+                break
 
+    def init_end_corridor(self):
+        cv2.namedWindow('End corridor')
+        cv2.setMouseCallback('End corridor', self.end_corridor, 0)
+        cv2.imshow('End corridor', self.init_frame)
+        while 1:
+            cv2.waitKey(1)
+            if self.corr_end_p1 is not None and self.corr_end_p2 is not None:
+                cv2.destroyWindow('End corridor')
+                break
+
+    def start_corridor(self, event, x, y, flags, params):
+        if event == cv2.EVENT_LBUTTONDOWN:
+            self.corr_begin_p1 = (x, y)
+        elif event == cv2.EVENT_LBUTTONUP:
+            self.corr_begin_p2 = (x, y)
+
+    def end_corridor(self, event, x, y, flags, params):
+        if event == cv2.EVENT_LBUTTONDOWN:
+            self.corr_end_p1 = (x, y)
+        elif event == cv2.EVENT_LBUTTONUP:
+            self.corr_end_p2 = (x, y)
+
+    #END INIT
 
     def handle_corridor(self):
-
         while 1:
             _, frame = self.feed.read()
-
+            self.traffic.find_traffic(frame)
 
             cv2.imshow('Warehouse', frame)
             k = cv2.waitKey(1) & 0xFF
@@ -188,8 +243,5 @@ class Traffic:
         self.draw_traffic(frame)
 
 
-#traffic = Traffic("img/walking.mp4")
-#traffic.set_body_cascade("cascades/haarcascade_fullbody.xml")
-
-corr = Corridor("img/walking.mp4")
+corr = Corridor("img/walking4.mp4")
 corr.init_corridor()

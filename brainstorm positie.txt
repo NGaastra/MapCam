@@ -7,7 +7,7 @@ Niet nauwkeurig
 Ingewikkelde wiskunde (geen evenredig verband)
 Niet modulair
 
-Breedte begin en eind van gang aangeven
+Breedte begin en eind van gang aangeven, vervolgens verhouding uitrekenen
 voordelen:
 Relatief simpel
 Snel te berekenen
