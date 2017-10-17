@@ -1,0 +1,16 @@
+Y coordinaat gebruiken om z coordinaat af te leiden
+voordelen:
+Relatief simpel
+Snel te berekenen
+nadelen:
+Niet nauwkeurig
+Ingewikkelde wiskunde (geen evenredig verband)
+Niet modulair
+
+Breedte begin en eind van gang aangeven
+voordelen:
+Relatief simpel
+Snel te berekenen
+Modulair
+nadelen:
+Initialisatie nodig voor elke camera mits alle camera's anders hangen relatief tot de gang

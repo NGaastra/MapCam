@@ -4,10 +4,17 @@ import numpy as np
 import imutils
 
 
-#PROBLEMS ATM
-#Region of interest not being updated when calling tracker!!! (Tracker problem? Problem in code?)
-#Region of interest is updated while known object is found and then changed back to original position when tracker is updated
-#PROBLEM WAS: Object was initialized with the frame it was found in. This frame was used to track so it was static.
+# Notes
+# 180 - 90 - cam angle = floor angle respect to camera
+# height gain = tan(angle)
+# position = height / height gain
+
+# PROBLEMS ATM
+# None
+
+# TODO
+# Haar cascade for forklift
+# Position fetching
 
 
 class Feed:
@@ -32,7 +39,7 @@ class Cascade:
 
     def get_objects(self, frame):
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        objects = self.cascade.detectMultiScale(gray, 1.1, 2)
+        objects = self.cascade.detectMultiScale(gray, 1.1, 4)
         return objects
 
 
@@ -43,13 +50,11 @@ class Object:
         self.object_name = object_name
 
     def draw(self, frame):
-        cv2.rectangle(frame, (int(self.roi[0]), int(self.roi[1])), (int(self.roi[0] + self.roi[2]), int(self.roi[1]+ self.roi[3])), (255, 0, 0), 2)
-        cv2.putText(frame, self.object_name, (int(self.roi[0]), int(self.roi[1]) - 5), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 1)
         if self.roi is None:
             print("ROI is not known")
         else:
-            cv2.rectangle(frame, (self.roi[0], self.roi[1]), (self.roi[2], self.roi[3]), (255, 0, 0), 2)
-            cv2.putText(frame, self.object_name, (self.roi[0], self.roi[1] - 20), "verdana", (0, 255, 255))
+            cv2.rectangle(frame, (int(self.roi[0]), int(self.roi[1])), (int(self.roi[0] + self.roi[2]), int(self.roi[1] + self.roi[3])), (255, 0, 0), 2)
+            cv2.putText(frame, self.object_name, (int(self.roi[0]), int(self.roi[1]) - 5), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 1)
             return frame
 
     def set_roi(self, roi):
@@ -76,9 +81,48 @@ class Tracker:
             ret, roi = self.tracker.update(frame)
             return ret, roi
 
+class Corridor:
+    def __init__(self, feed):
+        self.traffic = Traffic(feed)
+        self.feed = Feed(feed)
+        _, self.init_frame = self.feed.read()
+        self.corr_begin_p1, self.corr_begin_p2 = None, None
+        self.corr_end_p1, self.corr_end_p2 = None, None
+
+    def set_feed(self, feed):
+        self.feed.set_feed(feed)
+
+    def init_corridor(self):
+        while 1:
+            cv2.namedWindow('real image')
+            cv2.setMouseCallback('real image', self.on_mouse, 0)
+            cv2.imshow('real image', self.init_frame)
+            k = cv2.waitKey(1) & 0xFF
+            if k == 27:
+                break
+
+    def on_mouse(self, event, x, y, flags, params):
+        if event == cv2.EVENT_LBUTTONDOWN:
+            print('Start Mouse Position: ' + str(x) + ', ' + str(y))
+            start = (x, y)
+        elif event == cv2.EVENT_LBUTTONUP:
+            print('End Mouse Position: ' + str(x) + ', ' + str(y))
+            end = (x, y)
+
+
+    def handle_corridor(self):
+
+        while 1:
+            _, frame = self.feed.read()
+
+
+            cv2.imshow('Warehouse', frame)
+            k = cv2.waitKey(1) & 0xFF
+            if k == 27:
+                break
+
 class Traffic:
     def __init__(self, feed):
-        self.feed = Feed(feed)
         self.body_cascade = None
         self.traffic = []
 
@@ -113,6 +157,7 @@ class Traffic:
                     self.traffic.append(Object(frame, tuple(body), "Person"))
                     updated.append(len(self.traffic) - 1) #Add just added value from traffic list to updated list
                 else: #Found known body
+                    print("Reinit - ", body)
                     self.traffic[index].set_roi(tuple(body))
                     self.traffic[index].init_tracker(frame, tuple(body))
         return updated
@@ -120,9 +165,6 @@ class Traffic:
     def draw_traffic(self, frame):
         for i, obj in enumerate(self.traffic):
             obj.draw(frame)
-
-    def set_feed(self, feed):
-        self.feed.set_feed(feed)
 
     def get_dist(self, obj1, obj2):
         #Get x, y from object 1
@@ -141,18 +183,13 @@ class Traffic:
                 return i
         return -1
 
-    def find_traffic(self):
-        while 1:
-            ret, frame = self.feed.read()
-            self.update_bodies(frame)
-            self.draw_traffic(frame)
+    def find_traffic(self, frame):
+        self.update_bodies(frame)
+        self.draw_traffic(frame)
 
-            cv2.imshow('Warehouse', frame)
-            k = cv2.waitKey(1) & 0xFF
-            if k == 27:
-                break
 
-traffic = Traffic("img/warehouse.mp4")
-traffic.set_body_cascade("cascades/haarcascade_fullbody.xml")
+#traffic = Traffic("img/walking.mp4")
+#traffic.set_body_cascade("cascades/haarcascade_fullbody.xml")
 
-traffic.find_traffic()
+corr = Corridor("img/walking.mp4")
+corr.init_corridor()
