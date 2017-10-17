@@ -1,0 +1,1 @@
+Kijk in region rond de huidige ROI om processing area te verminderen
