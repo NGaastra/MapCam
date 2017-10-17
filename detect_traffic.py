@@ -1,7 +1,7 @@
 import cv2
 import math
-import numpy as np
 import imutils
+import constants
 
 
 # Notes
@@ -23,10 +23,11 @@ class Feed:
 
     def read(self):
         ret, read = self.feed.read()
-        crop = imutils.resize(read, width=640, height=480)
+        crop = imutils.resize(read, width=constants.FEED_WIDTH, height=constants.FEED_HEIGHT)
         return ret, crop
 
     def set_feed(self, feed):
+        self.close()
         self.feed = cv2.VideoCapture(feed)
 
     def close(self):
@@ -94,21 +95,21 @@ class Corridor:
         self.feed.set_feed(feed)
 
     #INIT
-    #Main init function (NOT PERMANENT YET)
+    #Main init function (HIGHLY LIKELY TO NOT BE PERMANENT)
     def init_corridor(self):
         self.init_start_corridor()
         self.init_end_corridor()
-        self.get_depth(200)
+        self.get_depth(0)
         self.draw_corridor_grid(10)
         self.draw_corridor()
 
-    def get_depth(self, angle):
-        height = 30
-        angle = 60 #deg
-        for i in range(90):
-            dist = height * math.tan(math.radians(i))
-            print(i, ", ", dist)
+    def map(self, x, in_min, in_max, out_min, out_max):
+        return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
 
+    def get_depth(self, y):
+        angle = self.map(y, 0, constants.FEED_HEIGHT, (constants.CAMERA_ANGLE + (constants.CAMERA_VIEWING_ANGLE / 2)), (constants.CAMERA_ANGLE - (constants.CAMERA_VIEWING_ANGLE / 2)))
+        dist = constants.CAMERA_HEIGHT * math.tan(math.radians(angle))
+        print(dist)
 
     def draw_corridor_grid(self, grid_width):
         begin_length = abs(self.corr_begin_p1[0] - self.corr_begin_p2[0])
