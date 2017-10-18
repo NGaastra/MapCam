@@ -5,9 +5,7 @@ import constants
 
 
 # Notes
-# 180 - 90 - cam angle = floor angle respect to camera
-# height gain = tan(angle)
-# position = height / height gain
+# None
 
 # PROBLEMS ATM
 # None
@@ -47,7 +45,7 @@ class Cascade:
 class Object:
     def __init__(self, frame, roi, object_name = "Unknown"):
         self.tracker = Tracker(frame, roi)
-        self.roi = roi
+        self.set_roi(roi)
         self.object_name = object_name
 
     def draw(self, frame):
@@ -60,12 +58,14 @@ class Object:
 
     def set_roi(self, roi):
         self.roi = roi
+        self.bottom = (roi[0] + (roi[2] / 2), roi[1] + roi[3])
 
     def init_tracker(self, frame, roi):
         self.tracker.init_tracker(frame, roi)
 
     def update_tracker(self, frame):
-        ok, self.roi = self.tracker.update(frame)
+        ok, roi = self.tracker.update(frame)
+        self.set_roi(roi)
         return ok
 
 class Tracker:
@@ -87,12 +87,24 @@ class Corridor:
         self.traffic = Traffic(feed)
         self.traffic.set_body_cascade("cascades/haarcascade_fullbody.xml")
         self.feed = Feed(feed)
-        self.init_frame = imutils.resize(cv2.imread("img/warehouse.jpg"), width=640, height=480)
+        _, self.init_frame = self.feed.read() #imutils.resize(cv2.imread("img/warehouse.jpg"), width=640, height=480)
         self.corr_begin_p1, self.corr_begin_p2 = None, None #Pass maybe as constructor argument
         self.corr_end_p1, self.corr_end_p2 = None, None
 
     def set_feed(self, feed):
         self.feed.set_feed(feed)
+
+    def map(self, x, in_min, in_max, out_min, out_max):
+        return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
+
+    def get_depth(self, y):
+        angle = self.map(y, 0, constants.FEED_HEIGHT, (constants.CAMERA_ANGLE + (constants.CAMERA_VIEWING_ANGLE / 2)), (constants.CAMERA_ANGLE - (constants.CAMERA_VIEWING_ANGLE / 2)))
+        dist = constants.CAMERA_HEIGHT * math.tan(math.radians(angle))
+        return dist
+
+    def get_position(self, obj):
+        pos = (obj.bottom[0], self.get_depth(obj.bottom[1]))
+        return pos
 
     #INIT
     #Main init function (HIGHLY LIKELY TO NOT BE PERMANENT)
@@ -102,14 +114,6 @@ class Corridor:
         self.get_depth(0)
         self.draw_corridor_grid(10)
         self.draw_corridor()
-
-    def map(self, x, in_min, in_max, out_min, out_max):
-        return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
-
-    def get_depth(self, y):
-        angle = self.map(y, 0, constants.FEED_HEIGHT, (constants.CAMERA_ANGLE + (constants.CAMERA_VIEWING_ANGLE / 2)), (constants.CAMERA_ANGLE - (constants.CAMERA_VIEWING_ANGLE / 2)))
-        dist = constants.CAMERA_HEIGHT * math.tan(math.radians(angle))
-        print(dist)
 
     def draw_corridor_grid(self, grid_width):
         begin_length = abs(self.corr_begin_p1[0] - self.corr_begin_p2[0])
@@ -171,7 +175,8 @@ class Corridor:
         while 1:
             _, frame = self.feed.read()
             self.traffic.find_traffic(frame)
-
+            for obj in self.traffic.traffic:
+                print(obj.object_name, " -- ", self.get_position(obj))
             cv2.imshow('Warehouse', frame)
             k = cv2.waitKey(1) & 0xFF
             if k == 27:
@@ -245,4 +250,4 @@ class Traffic:
 
 
 corr = Corridor("img/walking4.mp4")
-corr.init_corridor()
+corr.handle_corridor()
