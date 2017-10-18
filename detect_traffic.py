@@ -10,10 +10,14 @@ import constants
 # PROBLEMS ATM
 # None
 
+# Ideas
+# Increase efficiency
+# 1. Searching in region around new objects (maybe with backgournd subtraction)
+# 2. Don't search in ROI that already exists
+
 # TODO
 # Haar cascade for other traffic
-# Searching in local region of ROI for new location cascade search
-# Make seperate frame copy for drawing, so it doesnt interfere with haar features
+# Make seperate frame copy for drawing, so it doesnt interfere with haar features(?)
 # Add comments
 
 
@@ -213,9 +217,6 @@ class Corridor:
         while 1:
             _, frame = self.feed.read()
             self.traffic.find_traffic(frame)
-            for obj in self.traffic.traffic:
-                self.traffic.body_cascade.get_new_location(frame, obj)
-                print(obj.object_name, " -- ", self.get_position(obj))
             cv2.imshow('Warehouse', frame)
             k = cv2.waitKey(1) & 0xFF
             if k == 27:
@@ -295,5 +296,5 @@ class Traffic:
         self.draw_traffic(frame)
 
 
-corr = Corridor("img/walking4.mp4")
+corr = Corridor("img/twowalking.mp4")
 corr.handle_corridor()
