@@ -1,5 +1,5 @@
 # Camera config
-CAMERA_ANGLE = 60                       # Degrees
+CAMERA_ANGLE = 40                       # Degrees
 CAMERA_HEIGHT = 30                      # Meters
 CAMERA_VIEWING_ANGLE = 50               # Degrees (Total)
 

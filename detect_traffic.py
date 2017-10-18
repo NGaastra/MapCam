@@ -12,7 +12,7 @@ import constants
 
 # Ideas
 # Increase efficiency
-# 1. Searching in region around new objects (maybe with backgournd subtraction)
+# 1. Searching in region around new objects (maybe with background subtraction)
 # 2. Don't search in ROI that already exists
 
 # TODO
@@ -217,6 +217,7 @@ class Corridor:
         while 1:
             _, frame = self.feed.read()
             self.traffic.find_traffic(frame)
+
             cv2.imshow('Warehouse', frame)
             k = cv2.waitKey(1) & 0xFF
             if k == 27:
@@ -296,5 +297,5 @@ class Traffic:
         self.draw_traffic(frame)
 
 
-corr = Corridor("img/twowalking.mp4")
+corr = Corridor("img/walking2.mp4")
 corr.handle_corridor()
