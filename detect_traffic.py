@@ -48,8 +48,7 @@ class Feed:
 
 class Foreground:
     def __init__(self, background):
-        self.background = cv2.cvtColor(background, cv2.COLOR_BGR2GRAY)
-        self.subtractor = cv2.createBackgroundSubtractorMOG2()
+        self.background = cv2.cvtColor(imutils.resize(cv2.imread("img/warehousebg.jpg"), width=constants.FEED_WIDTH, height=constants.FEED_HEIGHT), cv2.COLOR_BGR2GRAY)#cv2.cvtColor(background, cv2.COLOR_BGR2GRAY)
 
     def set_background(self, background):
         self.background = background
@@ -241,8 +240,8 @@ class Corridor:
         while 1:
             _, frame = self.feed.read()
             self.traffic.find_traffic(frame)
-            self.traffic.get_pot_vehicles(self.feed.get_foreground(frame))
-
+            self.traffic.draw_vehicle(frame, self.traffic.get_pot_vehicles(self.feed.get_foreground(frame)))
+            
             cv2.imshow('Warehouse', frame)
             k = cv2.waitKey(30) & 0xFF
             if k == 27:
@@ -295,7 +294,10 @@ class Traffic:
 
     def get_pot_vehicles(self, frame):
         _, contours, _ = cv2.findContours(frame, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-        cv2.imshow("test", frame)
+        return contours
+
+    def draw_vehicle(self, frame, contours):
+        cv2.drawContours(frame, contours, -1, (255, 0, 0), 1)
 
     def draw_traffic(self, frame):
         for i, obj in enumerate(self.traffic):
@@ -326,5 +328,5 @@ class Traffic:
         self.draw_traffic(frame)
 
 
-corr = Corridor("img/walking4.mp4")
+corr = Corridor("img/warehouse2.mp4")
 corr.handle_corridor()
