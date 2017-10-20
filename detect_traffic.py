@@ -240,7 +240,8 @@ class Corridor:
     def handle_corridor(self):
         while 1:
             _, frame = self.feed.read()
-            frame = self.feed.get_foreground(frame)
+            self.traffic.find_traffic(frame)
+            self.traffic.get_pot_vehicles(self.feed.get_foreground(frame))
 
             cv2.imshow('Warehouse', frame)
             k = cv2.waitKey(30) & 0xFF
@@ -292,6 +293,10 @@ class Traffic:
                     self.traffic[index].init_tracker(frame, tuple(body))
         return updated
 
+    def get_pot_vehicles(self, frame):
+        _, contours, _ = cv2.findContours(frame, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        cv2.imshow("test", frame)
+
     def draw_traffic(self, frame):
         for i, obj in enumerate(self.traffic):
             obj.draw(frame)
@@ -310,7 +315,7 @@ class Traffic:
     def get_object(self, roi):
         # Iterate through every object in traffic
         for i, obj in enumerate(self.traffic):
-            # If distance is smaller than given SEARCH_MARGIN_NEW_LOC
+            # If distance is smaller than SEARCH_MARGIN_NEW_LOC
             if self.get_dist(roi, obj.roi) < constants.SEARCH_MARGIN_NEW_LOC:
                 # Return index
                 return i
