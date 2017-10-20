@@ -25,6 +25,7 @@ import numpy as np
 class Feed:
     def __init__(self, feed):
         self.feed = cv2.VideoCapture(feed)
+        self.foreground = Foreground(self.read()[1])
 
     def read(self):
         ret, read = self.feed.read()
@@ -34,6 +35,12 @@ class Feed:
     def set_feed(self, feed):
         self.close()
         self.feed = cv2.VideoCapture(feed)
+
+    def set_background(self, background):
+        self.foreground.set_background(background)
+
+    def get_foreground(self, frame):
+        return self.foreground.get(frame)
 
     def close(self):
         return self.feed.close()
@@ -142,7 +149,6 @@ class Corridor:
         self.traffic.set_body_cascade("cascades/haarcascade_fullbody.xml")
         self.feed = Feed(feed)
         _, self.init_frame = self.feed.read() #imutils.resize(cv2.imread("img/warehouse.jpg"), width=640, height=480)
-        self.foreground = Foreground(self.init_frame)
         self.corr_begin_p1, self.corr_begin_p2 = None, None #Pass maybe as constructor argument
         self.corr_end_p1, self.corr_end_p2 = None, None
 
@@ -161,9 +167,6 @@ class Corridor:
         # Calculate distance based on camera height and camera angle
         dist = constants.CAMERA_HEIGHT * math.tan(math.radians(angle))
         return dist
-
-    def get_foreground(self, frame):
-        return self.foreground.get(frame)
 
     def get_position(self, obj):
         pos = (obj.bottom[0], self.get_depth(obj.bottom[1]))
@@ -237,7 +240,7 @@ class Corridor:
     def handle_corridor(self):
         while 1:
             _, frame = self.feed.read()
-            frame = self.get_foreground(frame)
+            frame = self.feed.get_foreground(frame)
 
             cv2.imshow('Warehouse', frame)
             k = cv2.waitKey(30) & 0xFF
