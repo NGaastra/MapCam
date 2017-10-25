@@ -18,12 +18,13 @@ import numpy as np
 # Get vehicle
 # 1. Get backsub - people ROI's, search for contours in the newly created mask
 # Close contours merging
-# 1. Bounding box more contours (Apparantly possible)
+# 1. Bounding box more contours (Apparently possible)
 
 # TODO
 # Haar cascade for other traffic
 # Make seperate frame copy for drawing, so it doesnt interfere with haar features(?)
 # Add comments
+# Research findcontours parameters (make it work with absdiff output, would be perfect)
 
 
 class Feed:
@@ -60,8 +61,8 @@ class Foreground:
     def get(self, frame):
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         sub = cv2.absdiff(gray, self.background)
-        _, sub = cv2.threshold(sub, 0.2 * gray.max(), 255, cv2.THRESH_BINARY)
-        sub = cv2.dilate(sub, None, iterations=1)
+        #_, sub = cv2.threshold(sub, 0.2 * gray.max(), 255, cv2.THRESH_BINARY)
+        #sub = cv2.dilate(sub, None, iterations=1)
         return sub
 
 
