@@ -9,7 +9,7 @@ import numpy as np
 # None
 
 # PROBLEMS ATM
-# Cant convert 
+# Cant convert
 
 # Ideas
 # Increase efficiency
@@ -17,6 +17,8 @@ import numpy as np
 # 2. Don't search in ROI that already exists
 # Get vehicle
 # 1. Get backsub - people ROI's, search for contours in the newly created mask
+# Close contours merging
+# 1. Bounding box more contours (Apparantly possible)
 
 # TODO
 # Haar cascade for other traffic
@@ -57,9 +59,9 @@ class Foreground:
 
     def get(self, frame):
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        _, mask_fg = cv2.threshold(gray, 70, 255, cv2.THRESH_BINARY_INV)
-        _, mask_bg = cv2.threshold(self.background, 70, 255, cv2.THRESH_BINARY_INV)
-        sub = cv2.erode(mask_fg - mask_bg, None, iterations=1)
+        sub = cv2.absdiff(gray, self.background)
+        _, sub = cv2.threshold(sub, 0.2 * gray.max(), 255, cv2.THRESH_BINARY)
+        sub = cv2.dilate(sub, None, iterations=1)
         return sub
 
 
@@ -301,7 +303,8 @@ class Traffic:
         return contours
 
     def draw_vehicle(self, frame, contours):
-        cv2.drawContours(frame, contours, -1, (255, 0, 0), 1)
+        for obj in contours:
+            cv2.drawContours(frame, [cv2.convexHull(obj)], -1, (255, 0, 0), -1)
 
     def draw_traffic(self, frame):
         for i, obj in enumerate(self.traffic):
