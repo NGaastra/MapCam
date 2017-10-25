@@ -241,7 +241,7 @@ class Corridor:
             _, frame = self.feed.read()
             self.traffic.find_traffic(frame)
             self.traffic.draw_vehicle(frame, self.traffic.get_pot_vehicles(self.feed.get_foreground(frame)))
-            
+
             cv2.imshow('Warehouse', frame)
             k = cv2.waitKey(30) & 0xFF
             if k == 27:
