@@ -1,0 +1,1 @@
+Get foreground mask and remove all detected persons

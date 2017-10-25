@@ -9,12 +9,14 @@ import numpy as np
 # None
 
 # PROBLEMS ATM
-# None
+# Cant convert 
 
 # Ideas
 # Increase efficiency
 # 1. Searching in region around new objects (maybe with background subtraction)
 # 2. Don't search in ROI that already exists
+# Get vehicle
+# 1. Get backsub - people ROI's, search for contours in the newly created mask
 
 # TODO
 # Haar cascade for other traffic
@@ -48,7 +50,7 @@ class Feed:
 
 class Foreground:
     def __init__(self, background):
-        self.background = cv2.cvtColor(imutils.resize(cv2.imread("img/warehousebg.jpg"), width=constants.FEED_WIDTH, height=constants.FEED_HEIGHT), cv2.COLOR_BGR2GRAY)#cv2.cvtColor(background, cv2.COLOR_BGR2GRAY)
+        self.background = cv2.cvtColor(imutils.resize(cv2.imread("img/roadbg.png"), width=constants.FEED_WIDTH, height=constants.FEED_HEIGHT), cv2.COLOR_BGR2GRAY)#cv2.cvtColor(background, cv2.COLOR_BGR2GRAY)
 
     def set_background(self, background):
         self.background = background
@@ -240,9 +242,11 @@ class Corridor:
         while 1:
             _, frame = self.feed.read()
             self.traffic.find_traffic(frame)
-            self.traffic.draw_vehicle(frame, self.traffic.get_pot_vehicles(self.feed.get_foreground(frame)))
+            fg = self.feed.get_foreground(frame)
+            self.traffic.draw_vehicle(frame, self.traffic.get_pot_vehicles(fg))
 
             cv2.imshow('Warehouse', frame)
+            cv2.imshow('FG', fg)
             k = cv2.waitKey(30) & 0xFF
             if k == 27:
                 break
@@ -328,5 +332,5 @@ class Traffic:
         self.draw_traffic(frame)
 
 
-corr = Corridor("img/warehouse2.mp4")
+corr = Corridor("img/road.mp4")
 corr.handle_corridor()
