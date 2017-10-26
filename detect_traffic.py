@@ -25,6 +25,7 @@ import numpy as np
 # Make seperate frame copy for drawing, so it doesnt interfere with haar features(?)
 # Add comments
 # Research findcontours parameters (make it work with absdiff output, would be perfect)
+# Initiate tracker when objects too close
 
 
 class Feed:
@@ -59,10 +60,17 @@ class Foreground:
         self.background = background
 
     def get(self, frame):
+        #detector = cv2.SimpleBlobDetector_create()
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         sub = cv2.absdiff(gray, self.background)
-        #_, sub = cv2.threshold(sub, 0.2 * gray.max(), 255, cv2.THRESH_BINARY)
-        #sub = cv2.dilate(sub, None, iterations=1)
+        sub = cv2.bilateralFilter(sub, 9, 75, 75)
+        sub = cv2.morphologyEx(sub, cv2.MORPH_OPEN, None)
+        sub = cv2.dilate(sub, None, iterations=2)
+        _, sub = cv2.threshold(sub, constants.VEHICLE_THRESHOLD, 255, cv2.ADAPTIVE_THRESH_MEAN_C)
+        #keypoints = detector.detect(sub)
+        #cv2.drawKeypoints(frame, keypoints, np.array([]), (0, 0, 255), cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+        #sub = cv2.bitwise_not(sub)
+
         return sub
 
 
@@ -95,7 +103,8 @@ class Cascade:
 class Object:
     def __init__(self, frame, roi, object_name = "Unknown"):
         self.tracker = Tracker(frame, roi)
-        self.set_roi(roi)
+        self.roi = roi
+        self.bottom = (roi[0] + (roi[2] / 2), roi[1] + roi[3])
         self.object_name = object_name
 
     def draw(self, frame):
@@ -128,7 +137,7 @@ class Object:
 
         # Set ROI to new ROI determined by the tracker
         self.set_roi(roi)
-        return ok
+        return
 
 class Tracker:
     def __init__(self, frame, roi):
@@ -244,9 +253,10 @@ class Corridor:
     def handle_corridor(self):
         while 1:
             _, frame = self.feed.read()
-            self.traffic.find_traffic(frame)
             fg = self.feed.get_foreground(frame)
-            self.traffic.draw_vehicle(frame, self.traffic.get_pot_vehicles(fg))
+            self.traffic.get_pot_vehicles(fg)
+            self.traffic.find_traffic(frame)
+            #self.traffic.draw_vehicle(frame, self.traffic.get_pot_vehicles(fg))
 
             cv2.imshow('Warehouse', frame)
             cv2.imshow('FG', fg)
@@ -301,11 +311,25 @@ class Traffic:
 
     def get_pot_vehicles(self, frame):
         _, contours, _ = cv2.findContours(frame, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        for obj in contours:
+            if cv2.contourArea(obj) > constants.MIN_VEHICLE_SIZE:
+                rect = cv2.boundingRect(obj)
+                index = self.get_object(rect)
+                if index == -1:
+                    self.traffic.append(Object(frame, rect, "Vehicle"))
+                else:
+                    print(index, " - ", rect[2])
+                    self.traffic[index].set_roi(rect)
+                    #self.traffic[index].init_tracker(frame, rect)
         return contours
 
     def draw_vehicle(self, frame, contours):
         for obj in contours:
-            cv2.drawContours(frame, [cv2.convexHull(obj)], -1, (255, 0, 0), -1)
+            hull = cv2.convexHull(obj)
+            if cv2.contourArea(obj) > constants.MIN_VEHICLE_SIZE:
+                rec = cv2.boundingRect(hull)
+                cv2.rectangle(frame, (int(rec[0]), int(rec[1])), (int(rec[0] + rec[2]), int(rec[1] + rec[3])), constants.RECTANGLE_COLOR_VEHICLE, 2)
+                cv2.drawContours(frame, [hull], -1, (255, 0, 0), -1)
 
     def draw_traffic(self, frame):
         for i, obj in enumerate(self.traffic):

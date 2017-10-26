@@ -1,1 +1,2 @@
 Get foreground mask and remove all detected persons
+http://layer0.authentise.com/how-to-track-objects-with-stationary-background.html
