@@ -13,7 +13,7 @@ SEARCH_MARGIN_NEW_LOC = 50              # Pixels
 # Vehicle
 VEHICLE_THRESHOLD = 20                  # Intensity
 MIN_VEHICLE_SIZE = 1000                 # Pixels^2
-TRACKER_INITIATION_DIST = 100           # Pixels
+TRACKER_INITIATION_DIST = 20            # Pixels
 
 # Draw config
 RECTANGLE_COLOR_PERSON = (255, 0, 0)    # BGR

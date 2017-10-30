@@ -21,12 +21,9 @@ import numpy as np
 # 1. Bounding box more contours (Apparently possible)
 
 # TODO
-# Haar cascade for other traffic
-# Make seperate frame copy for drawing, so it doesnt interfere with haar features(?)
 # Add comments
-# Research findcontours parameters (make it work with absdiff output, would be perfect)
 # Initiate tracker when objects too close
-
+# Delete object when vehicle is off screen
 
 class Feed:
     def __init__(self, feed):
@@ -55,18 +52,42 @@ class Feed:
 class Foreground:
     def __init__(self, background):
         self.background = cv2.cvtColor(imutils.resize(cv2.imread("img/roadbg.png"), width=constants.FEED_WIDTH, height=constants.FEED_HEIGHT), cv2.COLOR_BGR2GRAY)#cv2.cvtColor(background, cv2.COLOR_BGR2GRAY)
-
+        self.subtractor = cv2.createBackgroundSubtractorMOG2()
     def set_background(self, background):
         self.background = background
 
     def get(self, frame):
-        #detector = cv2.SimpleBlobDetector_create()
+        # Convert image to grayscale image
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+        # Kernel for morphological transformation
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+
+        # Get absolute difference between background and current image
         sub = cv2.absdiff(gray, self.background)
+
+        # Add blur
         sub = cv2.bilateralFilter(sub, 9, 75, 75)
-        sub = cv2.morphologyEx(sub, cv2.MORPH_OPEN, None)
-        sub = cv2.dilate(sub, None, iterations=2)
+
+        # Threshold to convert absdiff image to binary image
         _, sub = cv2.threshold(sub, constants.VEHICLE_THRESHOLD, 255, cv2.ADAPTIVE_THRESH_MEAN_C)
+
+        # Fill any small holes
+        sub = cv2.morphologyEx(sub, cv2.MORPH_CLOSE, kernel)
+
+        # Remove noise
+        sub = cv2.morphologyEx(sub, cv2.MORPH_OPEN, kernel)
+
+        # Dilate to merge adjacent blobs
+        sub = cv2.dilate(sub, kernel, iterations=2)
+
+        #detector = cv2.SimpleBlobDetector_create()
+        #gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        #sub = cv2.absdiff(gray, self.background)
+        #sub = cv2.bilateralFilter(sub, 9, 75, 75)
+        #sub = cv2.morphologyEx(sub, cv2.MORPH_OPEN, None)
+        #sub = cv2.dilate(sub, None, iterations=2)
+        #_, sub = cv2.threshold(sub, constants.VEHICLE_THRESHOLD, 255, cv2.ADAPTIVE_THRESH_MEAN_C)
         #keypoints = detector.detect(sub)
         #cv2.drawKeypoints(frame, keypoints, np.array([]), (0, 0, 255), cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
         #sub = cv2.bitwise_not(sub)
@@ -185,77 +206,12 @@ class Corridor:
         pos = (obj.bottom[0], self.get_depth(obj.bottom[1]))
         return pos
 
-    #INIT
-    #Main init function (HIGHLY LIKELY TO NOT BE PERMANENT)
-    def init_corridor(self):
-        self.init_start_corridor()
-        self.init_end_corridor()
-        self.get_depth(0)
-        self.draw_corridor_grid(10)
-        self.draw_corridor()
-
-    def draw_corridor_grid(self, grid_width):
-        begin_length = abs(self.corr_begin_p1[0] - self.corr_begin_p2[0])
-        end_length = abs(self.corr_end_p1[0] - self.corr_end_p2[0])
-        block_width_begin = round(begin_length / grid_width, 0)
-        block_width_end = round(end_length / grid_width, 0)
-        for i in range(1, grid_width):
-            begin = (int(round(self.corr_begin_p1[0] + (i * block_width_begin), 0)), self.corr_begin_p1[1])
-            end = (int(round(self.corr_end_p1[0] + (i * block_width_end), 0)), self.corr_end_p1[1])
-            cv2.line(self.init_frame, begin, end, (255, 0, 0), 1)
-
-
-    def draw_corridor(self):
-        cv2.line(self.init_frame, self.corr_begin_p1, self.corr_begin_p2, (255, 0, 0), 1)
-        cv2.line(self.init_frame, self.corr_end_p1, self.corr_end_p2, (255, 0, 0), 1)
-        cv2.line(self.init_frame, self.corr_begin_p1, self.corr_end_p1, (255, 0, 0), 1)
-        cv2.line(self.init_frame, self.corr_begin_p2, self.corr_end_p2, (255, 0, 0), 1)
-        while 1:
-            cv2.imshow('Warehouse', self.init_frame)
-            k = cv2.waitKey(1) & 0xFF
-            if k == 27:
-                break
-
-    def init_start_corridor(self):
-        cv2.namedWindow('Begin corridor')
-        cv2.setMouseCallback('Begin corridor', self.start_corridor, 0)
-        cv2.imshow('Begin corridor', self.init_frame)
-        while 1:
-            cv2.waitKey(1)
-            if self.corr_begin_p1 is not None and self.corr_begin_p2 is not None:
-                cv2.destroyWindow('Begin corridor')
-                break
-
-    def init_end_corridor(self):
-        cv2.namedWindow('End corridor')
-        cv2.setMouseCallback('End corridor', self.end_corridor, 0)
-        cv2.imshow('End corridor', self.init_frame)
-        while 1:
-            cv2.waitKey(1)
-            if self.corr_end_p1 is not None and self.corr_end_p2 is not None:
-                cv2.destroyWindow('End corridor')
-                break
-
-    def start_corridor(self, event, x, y, flags, params):
-        if event == cv2.EVENT_LBUTTONDOWN:
-            self.corr_begin_p1 = (x, y)
-        elif event == cv2.EVENT_LBUTTONUP:
-            self.corr_begin_p2 = (x, y)
-
-    def end_corridor(self, event, x, y, flags, params):
-        if event == cv2.EVENT_LBUTTONDOWN:
-            self.corr_end_p1 = (x, y)
-        elif event == cv2.EVENT_LBUTTONUP:
-            self.corr_end_p2 = (x, y)
-
-    #END INIT
-
     def handle_corridor(self):
         while 1:
             _, frame = self.feed.read()
             fg = self.feed.get_foreground(frame)
-            self.traffic.get_pot_vehicles(fg)
             self.traffic.find_traffic(frame)
+            self.traffic.get_pot_vehicles(frame, fg)
             #self.traffic.draw_vehicle(frame, self.traffic.get_pot_vehicles(fg))
 
             cv2.imshow('Warehouse', frame)
@@ -272,64 +228,10 @@ class Traffic:
     def set_body_cascade(self, cascade):
         self.body_cascade = Cascade(cascade)
 
-    def update_bodies(self, frame):
-        updated = self.get_bodies(frame)
-        self.update_trackers(frame, updated)
-
     def update_trackers(self, frame, updated):
         for i, obj in enumerate(self.traffic):
             if i not in updated:
                 obj.update_tracker(frame)
-
-    def get_bodies(self, frame):
-        #Get all bodies with fullbody cascade
-        bodies = self.body_cascade.get_objects(frame)
-
-        #List to hold all updated objects indexes
-        updated = []
-
-        #Check if bodies are found
-        if bodies is not None:
-
-            #Iterate through every body
-            for body in bodies:
-
-                #Check if body already exists
-                index = self.get_object(body)
-                # Found new body
-                if index == -1:
-                    self.traffic.append(Object(frame, tuple(body), "Person"))
-                    updated.append(len(self.traffic) - 1) #Add just added value from traffic list to updated list
-                # Found known body
-                else:
-                    print("Reinit - ", body)
-                    # Set new ROI
-                    self.traffic[index].set_roi(tuple(body))
-                    # Update tracker initialization to match new ROI
-                    self.traffic[index].init_tracker(frame, tuple(body))
-        return updated
-
-    def get_pot_vehicles(self, frame):
-        _, contours, _ = cv2.findContours(frame, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-        for obj in contours:
-            if cv2.contourArea(obj) > constants.MIN_VEHICLE_SIZE:
-                rect = cv2.boundingRect(obj)
-                index = self.get_object(rect)
-                if index == -1:
-                    self.traffic.append(Object(frame, rect, "Vehicle"))
-                else:
-                    print(index, " - ", rect[2])
-                    self.traffic[index].set_roi(rect)
-                    #self.traffic[index].init_tracker(frame, rect)
-        return contours
-
-    def draw_vehicle(self, frame, contours):
-        for obj in contours:
-            hull = cv2.convexHull(obj)
-            if cv2.contourArea(obj) > constants.MIN_VEHICLE_SIZE:
-                rec = cv2.boundingRect(hull)
-                cv2.rectangle(frame, (int(rec[0]), int(rec[1])), (int(rec[0] + rec[2]), int(rec[1] + rec[3])), constants.RECTANGLE_COLOR_VEHICLE, 2)
-                cv2.drawContours(frame, [hull], -1, (255, 0, 0), -1)
 
     def draw_traffic(self, frame):
         for i, obj in enumerate(self.traffic):
