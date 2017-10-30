@@ -53,6 +53,7 @@ class Foreground:
     def __init__(self, background):
         self.background = cv2.cvtColor(imutils.resize(cv2.imread("img/roadbg.png"), width=constants.FEED_WIDTH, height=constants.FEED_HEIGHT), cv2.COLOR_BGR2GRAY)#cv2.cvtColor(background, cv2.COLOR_BGR2GRAY)
         self.subtractor = cv2.createBackgroundSubtractorMOG2()
+
     def set_background(self, background):
         self.background = background
 
@@ -122,11 +123,21 @@ class Cascade:
         return objects
 
 class Object:
-    def __init__(self, frame, roi, object_name = "Unknown"):
+    def __init__(self, frame, roi, object_name = "Pending..."):
         self.tracker = Tracker(frame, roi)
         self.roi = roi
         self.bottom = (roi[0] + (roi[2] / 2), roi[1] + roi[3])
         self.object_name = object_name
+
+    # Get cropped image of roi, img[y: y + h, x: x + w]
+    def crop_roi(self, frame):
+        return frame[int(self.roi[1]) : int(self.roi[1] + self.roi[3]), int(self.roi[0]) : int(self.roi[0] + self.roi[2])]
+
+    def roi_empty(self, contours):
+        for cnt in contours:
+            if cv2.pointPolygonTest(cnt, (int(self.roi[0] + (self.roi[2] / 2)), int(self.roi[1] + (self.roi[3] / 2))), True) > 0:
+                return True
+        return False
 
     def draw(self, frame):
         # ROI is not initialized
@@ -136,6 +147,9 @@ class Object:
         else:
             # Draw rectangle to match ROI
             cv2.rectangle(frame, (int(self.roi[0]), int(self.roi[1])), (int(self.roi[0] + self.roi[2]), int(self.roi[1] + self.roi[3])), constants.RECTANGLE_COLOR_PERSON, 2)
+
+            # Draw circle in the middle
+            cv2.circle(frame, (int(self.roi[0] + (self.roi[2] / 2)), int(self.roi[1] + (self.roi[3] / 2))), 3, (0, 255, 0), -1)
 
             # Put object name above the object
             cv2.putText(frame, self.object_name, (int(self.roi[0]), int(self.roi[1]) - 5), cv2.FONT_HERSHEY_SIMPLEX, 1, constants.TEXT_COLOR, 1)
@@ -158,7 +172,7 @@ class Object:
 
         # Set ROI to new ROI determined by the tracker
         self.set_roi(roi)
-        return
+        return ok
 
 class Tracker:
     def __init__(self, frame, roi):
@@ -179,12 +193,10 @@ class Tracker:
 
 class Corridor:
     def __init__(self, feed):
-        self.traffic = Traffic(feed)
+        self.traffic = Traffic()
         self.traffic.set_body_cascade("cascades/haarcascade_fullbody.xml")
         self.feed = Feed(feed)
         _, self.init_frame = self.feed.read() #imutils.resize(cv2.imread("img/warehouse.jpg"), width=640, height=480)
-        self.corr_begin_p1, self.corr_begin_p2 = None, None #Pass maybe as constructor argument
-        self.corr_end_p1, self.corr_end_p2 = None, None
 
     def set_feed(self, feed):
         # Set feed
@@ -210,10 +222,8 @@ class Corridor:
         while 1:
             _, frame = self.feed.read()
             fg = self.feed.get_foreground(frame)
-            self.traffic.find_traffic(frame)
-            self.traffic.get_pot_vehicles(frame, fg)
-            #self.traffic.draw_vehicle(frame, self.traffic.get_pot_vehicles(fg))
-
+            self.traffic.update_traffic(fg, frame)
+            self.traffic.draw_traffic(frame)
             cv2.imshow('Warehouse', frame)
             cv2.imshow('FG', fg)
             k = cv2.waitKey(30) & 0xFF
@@ -221,17 +231,38 @@ class Corridor:
                 break
 
 class Traffic:
-    def __init__(self, feed):
+    def __init__(self):
         self.body_cascade = None
         self.traffic = []
 
     def set_body_cascade(self, cascade):
         self.body_cascade = Cascade(cascade)
 
-    def update_trackers(self, frame, updated):
+    def get_objects(self, frame, frame2):
+        _, contours, _ = cv2.findContours(frame, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        cv2.drawContours(frame2, contours, -1, (255, 0, 0), 2)
+        return contours
+
+    def delete_empty(self, contours):
         for i, obj in enumerate(self.traffic):
-            if i not in updated:
-                obj.update_tracker(frame)
+            if not obj.roi_empty(contours):
+                self.traffic.pop(i)
+
+    def update_traffic(self, frame, frame2):
+        objs = self.get_objects(frame, frame2)
+        self.delete_empty(objs)
+        for obj in objs:
+            roi = cv2.boundingRect(obj)
+            index = self.get_index(roi)
+            if cv2.contourArea(obj) > constants.MIN_VEHICLE_SIZE:
+                if index == -1: # Add another condition here
+                    self.traffic.append(Object(frame, roi))
+                else:
+                    self.traffic[index].set_roi(roi)
+            else:
+                if index != -1:
+                    self.traffic.pop(index)
+
 
     def draw_traffic(self, frame):
         for i, obj in enumerate(self.traffic):
@@ -239,20 +270,21 @@ class Traffic:
 
     def get_dist(self, obj1, obj2):
         #Get x, y from object 1
-        x1, y1 = obj1[0], obj1[1]
+        x1, y1 = int(obj1[0] + (obj1[2] / 2)), int(obj1[1] + (obj1[3] / 2))
 
         #Get x, y from object 2
-        x2, y2 = obj2[0], obj2[1]
+        x2, y2 = int(obj2[0] + (obj2[2] / 2)), int(obj2[1] + (obj2[3] / 2))
 
         #Get distance between objects
         ans = int(math.hypot(x2 - x1, y2 - y1))
         return ans
 
-    def get_object(self, roi):
+    def get_index(self, roi):
         # Iterate through every object in traffic
         for i, obj in enumerate(self.traffic):
             # If distance is smaller than SEARCH_MARGIN_NEW_LOC
-            if self.get_dist(roi, obj.roi) < constants.SEARCH_MARGIN_NEW_LOC:
+            dist = self.get_dist(roi, obj.roi)
+            if dist < constants.SEARCH_MARGIN_NEW_LOC:
                 # Return index
                 return i
         return -1

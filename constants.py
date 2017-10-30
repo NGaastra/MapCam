@@ -12,7 +12,7 @@ FEED_HEIGHT = 480                       # Pixels
 SEARCH_MARGIN_NEW_LOC = 50              # Pixels
 # Vehicle
 VEHICLE_THRESHOLD = 20                  # Intensity
-MIN_VEHICLE_SIZE = 1000                 # Pixels^2
+MIN_VEHICLE_SIZE = 600                  # Pixels^2
 TRACKER_INITIATION_DIST = 20            # Pixels
 
 # Draw config
