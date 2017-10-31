@@ -9,21 +9,14 @@ import numpy as np
 # None
 
 # PROBLEMS ATM
-# Cant convert
+
 
 # Ideas
-# Increase efficiency
-# 1. Searching in region around new objects (maybe with background subtraction)
-# 2. Don't search in ROI that already exists
-# Get vehicle
-# 1. Get backsub - people ROI's, search for contours in the newly created mask
-# Close contours merging
-# 1. Bounding box more contours (Apparently possible)
+
 
 # TODO
 # Add comments
 # Initiate tracker when objects too close
-# Delete object when vehicle is off screen
 
 class Feed:
     def __init__(self, feed):
@@ -51,7 +44,7 @@ class Feed:
 
 class Foreground:
     def __init__(self, background):
-        self.background = cv2.cvtColor(imutils.resize(cv2.imread("img/roadbg.png"), width=constants.FEED_WIDTH, height=constants.FEED_HEIGHT), cv2.COLOR_BGR2GRAY)#cv2.cvtColor(background, cv2.COLOR_BGR2GRAY)
+        self.background = cv2.cvtColor(imutils.resize(cv2.imread("img/walking4.png"), width=constants.FEED_WIDTH, height=constants.FEED_HEIGHT), cv2.COLOR_BGR2GRAY)#cv2.cvtColor(background, cv2.COLOR_BGR2GRAY)
         self.subtractor = cv2.createBackgroundSubtractorMOG2()
 
     def set_background(self, background):
@@ -71,7 +64,9 @@ class Foreground:
         sub = cv2.bilateralFilter(sub, 9, 75, 75)
 
         # Threshold to convert absdiff image to binary image
-        _, sub = cv2.threshold(sub, constants.VEHICLE_THRESHOLD, 255, cv2.ADAPTIVE_THRESH_MEAN_C)
+        _, sub = cv2.threshold(sub, constants.VEHICLE_THRESHOLD, 255, cv2.cv2.ADAPTIVE_THRESH_GAUSSIAN_C)
+
+        sub = cv2.bitwise_not(sub)
 
         # Fill any small holes
         sub = cv2.morphologyEx(sub, cv2.MORPH_CLOSE, kernel)
@@ -108,19 +103,7 @@ class Cascade:
         objects = self.cascade.detectMultiScale(gray, 1.1, 4)
         return objects
 
-    def get_new_location(self, frame, obj):
-        # Convert frame to grayscale
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-        # Crop grayscale frame to ROI + margin size
-        gray_crop = gray[int(obj.roi[1]) - constants.SEARCH_MARGIN_NEW_LOC: int(obj.roi[1] + obj.roi[3]) + constants.SEARCH_MARGIN_NEW_LOC,
-                             int(obj.roi[0]) - constants.SEARCH_MARGIN_NEW_LOC: int(obj.roi[0] + obj.roi[2]) + constants.SEARCH_MARGIN_NEW_LOC]
-
-        cv2.imshow('search', gray_crop)
-
-        # Search in this cropped area for cascade match
-        objects = self.cascade.detectMultiScale(gray_crop, 1.1, 4)
-        return objects
 
 class Object:
     def __init__(self, frame, roi, object_name = "Pending..."):
@@ -131,7 +114,7 @@ class Object:
 
     # Get cropped image of roi, img[y: y + h, x: x + w]
     def crop_roi(self, frame):
-        return frame[int(self.roi[1]) : int(self.roi[1] + self.roi[3]), int(self.roi[0]) : int(self.roi[0] + self.roi[2])]
+        return frame[int(self.roi[1]) - constants.ROI_CROP_MARGIN : int(self.roi[1] + self.roi[3]) + constants.ROI_CROP_MARGIN, int(self.roi[0]) - constants.ROI_CROP_MARGIN : int(self.roi[0] + self.roi[2]) + constants.ROI_CROP_MARGIN]
 
     def roi_empty(self, contours):
         for cnt in contours:
@@ -154,6 +137,9 @@ class Object:
             # Put object name above the object
             cv2.putText(frame, self.object_name, (int(self.roi[0]), int(self.roi[1]) - 5), cv2.FONT_HERSHEY_SIMPLEX, 1, constants.TEXT_COLOR, 1)
             return frame
+
+    def set_name(self, name):
+        self.object_name = name
 
     def set_roi(self, roi):
         # Set ROI
@@ -221,10 +207,13 @@ class Corridor:
     def handle_corridor(self):
         while 1:
             _, frame = self.feed.read()
+            draw_frame = frame.copy()
             fg = self.feed.get_foreground(frame)
-            self.traffic.update_traffic(fg, frame)
-            self.traffic.draw_traffic(frame)
-            cv2.imshow('Warehouse', frame)
+            self.traffic.update_objects(fg)
+            self.traffic.draw_traffic(draw_frame)
+            self.traffic.identify_person(frame)
+
+            cv2.imshow('Warehouse', draw_frame)
             cv2.imshow('FG', fg)
             k = cv2.waitKey(30) & 0xFF
             if k == 27:
@@ -235,12 +224,20 @@ class Traffic:
         self.body_cascade = None
         self.traffic = []
 
+    def identify_person(self, frame):
+        for obj in self.traffic:
+            crop = obj.crop_roi(frame)
+            roi = self.body_cascade.get_objects(crop)
+            if len(roi) == 1:
+                obj.set_roi(roi[0])
+                obj.set_name("Person")
+                print(obj.object_name)
+
     def set_body_cascade(self, cascade):
         self.body_cascade = Cascade(cascade)
 
-    def get_objects(self, frame, frame2):
+    def get_objects(self, frame):
         _, contours, _ = cv2.findContours(frame, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        cv2.drawContours(frame2, contours, -1, (255, 0, 0), 2)
         return contours
 
     def delete_empty(self, contours):
@@ -248,8 +245,8 @@ class Traffic:
             if not obj.roi_empty(contours):
                 self.traffic.pop(i)
 
-    def update_traffic(self, frame, frame2):
-        objs = self.get_objects(frame, frame2)
+    def update_objects(self, frame):
+        objs = self.get_objects(frame)
         self.delete_empty(objs)
         for obj in objs:
             roi = cv2.boundingRect(obj)
@@ -258,11 +255,12 @@ class Traffic:
                 if index == -1: # Add another condition here
                     self.traffic.append(Object(frame, roi))
                 else:
+                    if self.traffic[index].object_name == "Person":
+                        continue
                     self.traffic[index].set_roi(roi)
             else:
                 if index != -1:
                     self.traffic.pop(index)
-
 
     def draw_traffic(self, frame):
         for i, obj in enumerate(self.traffic):
@@ -294,5 +292,5 @@ class Traffic:
         self.draw_traffic(frame)
 
 
-corr = Corridor("img/road.mp4")
+corr = Corridor("img/walking4.mp4")
 corr.handle_corridor()
