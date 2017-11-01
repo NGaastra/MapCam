@@ -9,11 +9,11 @@ FEED_HEIGHT = 480                       # Pixels
 
 # Object search config
 # General
-SEARCH_MARGIN_NEW_LOC = 60              # Pixels
+SEARCH_MARGIN_NEW_LOC = 40              # Pixels
 # Person
 ROI_CROP_MARGIN = 20
 # Vehicle
-VEHICLE_THRESHOLD = 20                  # Intensity
+VEHICLE_THRESHOLD = 25                  # Intensity
 MIN_VEHICLE_SIZE = 600                  # Pixels^2
 TRACKER_INITIATION_DIST = 20            # Pixels
 

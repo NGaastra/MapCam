@@ -44,7 +44,7 @@ class Feed:
 
 class Foreground:
     def __init__(self, background):
-        self.background = cv2.cvtColor(imutils.resize(cv2.imread("img/walking4.png"), width=constants.FEED_WIDTH, height=constants.FEED_HEIGHT), cv2.COLOR_BGR2GRAY)#cv2.cvtColor(background, cv2.COLOR_BGR2GRAY)
+        self.background = cv2.cvtColor(imutils.resize(cv2.imread("img/roadbg.png"), width=constants.FEED_WIDTH, height=constants.FEED_HEIGHT), cv2.COLOR_BGR2GRAY)#cv2.cvtColor(background, cv2.COLOR_BGR2GRAY)
         self.subtractor = cv2.createBackgroundSubtractorMOG2()
 
     def set_background(self, background):
@@ -64,7 +64,7 @@ class Foreground:
         sub = cv2.bilateralFilter(sub, 9, 75, 75)
 
         # Threshold to convert absdiff image to binary image
-        _, sub = cv2.threshold(sub, constants.VEHICLE_THRESHOLD, 255, cv2.cv2.ADAPTIVE_THRESH_GAUSSIAN_C)
+        _, sub = cv2.threshold(sub, constants.VEHICLE_THRESHOLD, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C)
 
         sub = cv2.bitwise_not(sub)
 
@@ -121,6 +121,14 @@ class Object:
             if cv2.pointPolygonTest(cnt, (int(self.roi[0] + (self.roi[2] / 2)), int(self.roi[1] + (self.roi[3] / 2))), True) > 0:
                 return True
         return False
+
+    def roi_empty_2(self, frame):
+        crop = self.crop_roi(frame)
+        if 255 in crop:
+            return False
+        for val in crop:
+            print(val)
+        return True
 
     def draw(self, frame):
         # ROI is not initialized
@@ -212,7 +220,6 @@ class Corridor:
             self.traffic.update_objects(fg)
             self.traffic.draw_traffic(draw_frame)
             self.traffic.identify_person(frame)
-
             cv2.imshow('Warehouse', draw_frame)
             cv2.imshow('FG', fg)
             k = cv2.waitKey(30) & 0xFF
@@ -231,7 +238,6 @@ class Traffic:
             if len(roi) == 1:
                 obj.set_roi(roi[0])
                 obj.set_name("Person")
-                print(obj.object_name)
 
     def set_body_cascade(self, cascade):
         self.body_cascade = Cascade(cascade)
@@ -240,14 +246,15 @@ class Traffic:
         _, contours, _ = cv2.findContours(frame, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         return contours
 
-    def delete_empty(self, contours):
+    def delete_empty(self, frame):
         for i, obj in enumerate(self.traffic):
-            if not obj.roi_empty(contours):
+            check = obj.roi_empty_2(frame)
+            if not check:
                 self.traffic.pop(i)
 
     def update_objects(self, frame):
         objs = self.get_objects(frame)
-        self.delete_empty(objs)
+        self.delete_empty(frame)
         for obj in objs:
             roi = cv2.boundingRect(obj)
             index = self.get_index(roi)
@@ -292,5 +299,5 @@ class Traffic:
         self.draw_traffic(frame)
 
 
-corr = Corridor("img/walking4.mp4")
+corr = Corridor("img/road.mp4")
 corr.handle_corridor()
